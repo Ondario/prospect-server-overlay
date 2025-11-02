@@ -384,6 +384,11 @@ public partial class MainWindow : Window
         _settingsHotkey = _configuration.GetValue<string>("OverlaySettings:SettingsHotkey", "Ctrl+Q");
         DebugLogger.Log($"Settings hotkey set to {_settingsHotkey}");
 
+        // Apply font size
+        var fontSize = _configuration.GetValue<double>("OverlaySettings:FontSize", 12);
+        ApplyFontSize(fontSize);
+        DebugLogger.Log($"Font size set to {fontSize}");
+
         // Get log file path from config or default
         var configLogPath = _configuration.GetValue<string>("LogSettings:LogFilePath", "");
         if (!string.IsNullOrEmpty(configLogPath))
@@ -664,7 +669,6 @@ public partial class MainWindow : Window
                 _serverInfo.Region = "Waiting for log file";
                 _serverInfo.ServerId = "Waiting for log file";
                 _serverInfo.SessionId = "Waiting for log file";
-                _serverInfo.ServerAddress = "Waiting for log file";
                 return;
             }
 
@@ -690,7 +694,6 @@ public partial class MainWindow : Window
                 _serverInfo.Region = serverData.Value.region;
                 _serverInfo.ServerId = serverData.Value.serverId;
                 _serverInfo.SessionId = serverData.Value.sessionId;
-                _serverInfo.ServerAddress = serverData.Value.serverAddress;
             }
             else
             {
@@ -708,7 +711,6 @@ public partial class MainWindow : Window
                     _serverInfo.Region = "Waiting for match...";
                     _serverInfo.ServerId = "Waiting for match...";
                     _serverInfo.SessionId = "Waiting for match...";
-                    _serverInfo.ServerAddress = "Waiting for match...";
                 }
             }
         }
@@ -719,7 +721,6 @@ public partial class MainWindow : Window
             _serverInfo.Region = "Error reading logs";
             _serverInfo.ServerId = "Error reading logs";
             _serverInfo.SessionId = "Error reading logs";
-            _serverInfo.ServerAddress = ex.Message;
         }
     }
 
@@ -728,7 +729,6 @@ public partial class MainWindow : Window
         _serverInfo.Region = serverInfo.region;
         _serverInfo.ServerId = serverInfo.serverId;
         _serverInfo.SessionId = serverInfo.sessionId;
-        _serverInfo.ServerAddress = serverInfo.serverAddress;
         _serverInfo.Status = $"Connected to {serverInfo.region} (cached)";
     }
 
@@ -886,7 +886,7 @@ public partial class MainWindow : Window
         {
             Title = "Prospect Server Overlay - Settings",
             Width = 450,
-            Height = 500,
+            Height = 550,
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ResizeMode = ResizeMode.NoResize,
             WindowStyle = WindowStyle.None,
@@ -906,6 +906,8 @@ public partial class MainWindow : Window
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Debug checkbox
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Hotkey label
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Hotkey input
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Font size label
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Font size slider
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Made by note
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Buttons
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Fortune quote
@@ -1139,6 +1141,118 @@ public partial class MainWindow : Window
         };
         Grid.SetRow(hotkeyTextBox, 7);
 
+        // Font size settings
+        var currentFontSize = _configuration.GetValue<double>("OverlaySettings:FontSize", 12);
+        var fontSizeLabel = new TextBlock { Text = "Font Size:", Margin = new Thickness(0, 0, 0, 5) };
+        Grid.SetRow(fontSizeLabel, 8);
+
+        var fontSizeTextBox = new TextBox
+        {
+            Text = $"{currentFontSize:F0}",
+            Width = 60,
+            Height = 25,
+            Margin = new Thickness(0, 0, 5, 0),
+            Foreground = Brushes.Black,
+            Background = Brushes.White,
+            TextAlignment = TextAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+
+        var fontSizeUpButton = new Button
+        {
+            Content = "▲",
+            Width = 30,
+            Height = 25,
+            Margin = new Thickness(0, 0, 2, 0),
+            FontSize = 12,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromRgb(0, 120, 0)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(1),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0, 255, 0))
+        };
+
+        var fontSizeDownButton = new Button
+        {
+            Content = "▼",
+            Width = 30,
+            Height = 25,
+            Margin = new Thickness(0, 0, 0, 0),
+            FontSize = 12,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Color.FromRgb(0, 120, 0)),
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(1),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0, 255, 0))
+        };
+
+        var fontSizePanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        fontSizePanel.Children.Add(fontSizeTextBox);
+        fontSizePanel.Children.Add(fontSizeUpButton);
+        fontSizePanel.Children.Add(fontSizeDownButton);
+        Grid.SetRow(fontSizePanel, 9);
+
+        // Helper function to update font size and validate
+        Action<double> updateFontSize = (newSize) =>
+        {
+            var clampedSize = Math.Max(8, Math.Min(24, newSize));
+            fontSizeTextBox.Text = $"{clampedSize:F0}";
+            ApplyFontSize(clampedSize);
+        };
+
+        // Up button click
+        fontSizeUpButton.Click += (s, e) =>
+        {
+            if (double.TryParse(fontSizeTextBox.Text, out var currentValue))
+            {
+                updateFontSize(currentValue + 1);
+            }
+            else
+            {
+                updateFontSize(12);
+            }
+        };
+
+        // Down button click
+        fontSizeDownButton.Click += (s, e) =>
+        {
+            if (double.TryParse(fontSizeTextBox.Text, out var currentValue))
+            {
+                updateFontSize(currentValue - 1);
+            }
+            else
+            {
+                updateFontSize(12);
+            }
+        };
+
+        // TextBox text changed - allow manual entry
+        fontSizeTextBox.TextChanged += (s, e) =>
+        {
+            if (double.TryParse(fontSizeTextBox.Text, out var newValue))
+            {
+                var clampedSize = Math.Max(8, Math.Min(24, newValue));
+                if (clampedSize != newValue)
+                {
+                    fontSizeTextBox.Text = $"{clampedSize:F0}";
+                }
+                ApplyFontSize(clampedSize);
+            }
+        };
+
+        // TextBox lost focus - ensure valid value
+        fontSizeTextBox.LostFocus += (s, e) =>
+        {
+            if (!double.TryParse(fontSizeTextBox.Text, out var value) || value < 8 || value > 24)
+            {
+                updateFontSize(12);
+            }
+        };
+
         // Make the textbox clickable to capture new hotkey
         hotkeyTextBox.PreviewMouseDown += (s, e) =>
         {
@@ -1214,7 +1328,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 5, 0, 15)
         };
-        Grid.SetRow(madeByLabel, 8);
+        Grid.SetRow(madeByLabel, 10);
 
         // Buttons
         var buttonPanel = new StackPanel
@@ -1223,7 +1337,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 20, 0, 0)
         };
-        Grid.SetRow(buttonPanel, 9);
+        Grid.SetRow(buttonPanel, 11);
 
         var saveButton = new Button
         {
@@ -1270,6 +1384,8 @@ public partial class MainWindow : Window
         grid.Children.Add(debugCheckBox);
         grid.Children.Add(hotkeyLabel);
         grid.Children.Add(hotkeyTextBox);
+        grid.Children.Add(fontSizeLabel);
+        grid.Children.Add(fontSizePanel);
         grid.Children.Add(madeByLabel);
         grid.Children.Add(buttonPanel);
 
@@ -1283,7 +1399,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 15, 0, 10)
         };
-        Grid.SetRow(fortuneQuote, 10);
+        Grid.SetRow(fortuneQuote, 12);
         grid.Children.Add(fortuneQuote);
 
         var border = new Border
@@ -1310,6 +1426,7 @@ public partial class MainWindow : Window
                 var newLogPath = logPathTextBox.Text;
                 var newPosition = selectedPosition;
                 var debugEnabled = debugCheckBox.IsChecked ?? false;
+                var newFontSize = double.TryParse(fontSizeTextBox.Text, out var fontSize) ? Math.Max(8, Math.Min(24, fontSize)) : 12;
 
                 // Update in-memory settings
                 _serverInfo.DebugVisible = debugEnabled;
@@ -1333,7 +1450,8 @@ public partial class MainWindow : Window
                         ShowServerId = false, // Could make this configurable later
                         AutoStartMinimized = false, // Could make this configurable later 
                         DebugVisible = debugEnabled,
-                        SettingsHotkey = _settingsHotkey
+                        SettingsHotkey = _settingsHotkey,
+                        FontSize = newFontSize
                     },
                     LogSettings = new
                     {
@@ -1356,11 +1474,15 @@ public partial class MainWindow : Window
                 // Update window position
                 UpdateWindowPosition(newPosition);
 
+                // Apply font size immediately
+                ApplyFontSize(newFontSize);
+
                 DebugLogger.Log($"Settings saved to config file:");
                 DebugLogger.Log($"  DebugVisible: {debugEnabled}");
                 DebugLogger.Log($"  SettingsHotkey: {_settingsHotkey}");
                 DebugLogger.Log($"  WindowPosition: ({currentLeft}, {currentTop})");
                 DebugLogger.Log($"  LogPath: {newLogPath}");
+                DebugLogger.Log($"  FontSize: {newFontSize}");
 
                         // Ensure main window stays on top immediately after settings change
                 Dispatcher.Invoke(() => ForceTopMostImmediately());
@@ -1503,6 +1625,45 @@ public partial class MainWindow : Window
 
         // Ensure window stays on top after position change
         Dispatcher.Invoke(() => ForceTopMostImmediately());
+    }
+
+    /// <summary>
+    /// Applies font size to all TextBlocks in the overlay, maintaining proportional sizes
+    /// </summary>
+    private void ApplyFontSize(double baseFontSize)
+    {
+        // Clamp font size to valid range
+        baseFontSize = Math.Max(8, Math.Min(24, baseFontSize));
+
+        try
+        {
+            // Apply proportional font sizes based on original sizes (base was 12)
+            // Title and Region: 12/12 = 1.0
+            // SessionId: 10/12 = 0.833...
+            // Status: 8/12 = 0.666...
+            // DebugText: 7/12 = 0.583...
+
+            if (TitleText != null)
+                TitleText.FontSize = baseFontSize;
+
+            if (RegionText != null)
+                RegionText.FontSize = baseFontSize;
+
+            if (SessionIdText != null)
+                SessionIdText.FontSize = baseFontSize * (10.0 / 12.0);
+
+            if (StatusText != null)
+                StatusText.FontSize = baseFontSize * (8.0 / 12.0);
+
+            if (DebugText != null)
+                DebugText.FontSize = baseFontSize * (7.0 / 12.0);
+
+            DebugLogger.Log($"Font sizes applied - Base: {baseFontSize:F1}, Title/Region: {baseFontSize:F1}, Session: {baseFontSize * (10.0 / 12.0):F1}, Status: {baseFontSize * (8.0 / 12.0):F1}, Debug: {baseFontSize * (7.0 / 12.0):F1}");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.LogError("Error applying font size", ex);
+        }
     }
 
     protected override void OnClosed(EventArgs e)
