@@ -62,6 +62,7 @@ Edit `ProspectServerOverlay/appsettings.json` to customize:
 - Log file path
 - Update intervals
 - Debug settings
+- Text size
 
 The application automatically monitors the Prospect log file and displays server information in a transparent overlay window.
 
@@ -71,11 +72,10 @@ The application automatically monitors the Prospect log file and displays server
 - **Always-on-top Overlay**: Transparent overlay window that stays on top of all applications, including fullscreen games
 - **Server Information Display**:
   - Current region (e.g., WestUs, EastUs)
-  - Server IP address and port
   - Session ID
   - Status indicator showing monitoring state
   - Debug information toggle
-- **Configurable**: Customizable via `appsettings.json` for position, opacity, and behavior
+- **Configurable**: Customizable via `appsettings.json` for position, opacity, text size, and behavior
 - **Performance Optimized**: Minimal impact on gaming performance
 
 ## How to Use
