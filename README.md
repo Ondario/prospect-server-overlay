@@ -1,6 +1,6 @@
 # Prospect Server Overlay
 
-A Windows overlay application that monitors the Prospect game log file and displays current server information including region, server address, and session ID.
+A Windows overlay application that monitors the Prospect game log file and displays current server information including server region, and session ID.
 
 ## Solution Structure
 
