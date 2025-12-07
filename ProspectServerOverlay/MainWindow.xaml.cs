@@ -306,6 +306,26 @@ public partial class MainWindow : Window
     private bool _isCapturingHotkey = false;
     private DateTime _lastFileReadTime = DateTime.MinValue; // Cache file state to avoid unnecessary reads
     private (string region, string serverId, string sessionId, string serverAddress)? _cachedServerInfo;
+    private HwndSource? _hwndSource;
+
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
+    private const int WM_MOUSEACTIVATE = 0x0021;
+    private const int MA_NOACTIVATE = 3;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+    private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
     public MainWindow()
     {
@@ -515,6 +535,52 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ApplyOverlayWindowStyles(IntPtr windowHandle)
+    {
+        try
+        {
+            var currentStyle = GetWindowLongPtrSafe(windowHandle, GWL_EXSTYLE).ToInt64();
+            var updatedStyle = currentStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
+            SetWindowLongPtrSafe(windowHandle, GWL_EXSTYLE, new IntPtr(updatedStyle));
+            DebugLogger.Log("Overlay window styles updated to prevent activation");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.LogError("Failed to apply overlay window styles", ex);
+        }
+    }
+
+    private IntPtr WindowMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_MOUSEACTIVATE)
+        {
+            handled = true;
+            return new IntPtr(MA_NOACTIVATE);
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static IntPtr GetWindowLongPtrSafe(IntPtr hWnd, int nIndex)
+    {
+        if (IntPtr.Size == 8)
+        {
+            return GetWindowLongPtr(hWnd, nIndex);
+        }
+
+        return new IntPtr(GetWindowLong32(hWnd, nIndex));
+    }
+
+    private static IntPtr SetWindowLongPtrSafe(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        if (IntPtr.Size == 8)
+        {
+            return SetWindowLongPtr(hWnd, nIndex, dwNewLong);
+        }
+
+        return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -524,6 +590,14 @@ public partial class MainWindow : Window
             // Get the window handle
             var windowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             DebugLogger.Log($"Window handle obtained: {windowHandle}");
+
+            ApplyOverlayWindowStyles(windowHandle);
+
+            _hwndSource = HwndSource.FromHwnd(windowHandle);
+            if (_hwndSource != null)
+            {
+                _hwndSource.AddHook(WindowMessageHook);
+            }
 
             // Register global hotkey
             if (WindowUtils.RegisterGlobalHotkey(windowHandle, _settingsHotkey))
@@ -1671,6 +1745,12 @@ public partial class MainWindow : Window
         DebugLogger.Log("Application closing - stopping timers, unregistering hotkey, and disposing file watcher");
         _updateTimer.Stop();
         _topmostTimer.Stop();
+
+        if (_hwndSource != null)
+        {
+            _hwndSource.RemoveHook(WindowMessageHook);
+            _hwndSource = null;
+        }
 
         // Unregister the global hotkey
         WindowUtils.UnregisterGlobalHotkey();
